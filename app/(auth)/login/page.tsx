@@ -11,7 +11,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showHints, setShowHints] = useState(useMockData);
+  const [showHints, setShowHints] = useState(false);
 
   useEffect(() => {
     const checkSession = async () => {
