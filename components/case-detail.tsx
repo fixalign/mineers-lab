@@ -14,6 +14,8 @@ type Patient = {
   service: string;
   shade: string;
   notes: string | null;
+  delivery_date?: string | null;
+  lab_id?: string | null;
   status?: "draft" | "sent" | "done" | "finished";
   created_by: string;
   created_at: string;
@@ -37,12 +39,14 @@ export default function CaseDetail({ id }: { id: string }) {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [editValues, setEditValues] = useState<Partial<Patient>>({});
+  const [labs, setLabs] = useState<Array<{ id: string; name: string }>>([]);
   const uploadRef = useRef<HTMLInputElement>(null);
   const [selectedFiles, setSelectedFiles] = useState<FileList | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const acceptTypes =
     ".jpg,.jpeg,.png,.gif,.webp,.pdf,.dcm,.stl,.ply,.obj,.3mf,.zip";
   const [updatingDone, setUpdatingDone] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     const init = async () => {
@@ -59,6 +63,23 @@ export default function CaseDetail({ id }: { id: string }) {
   useEffect(() => {
     const load = async () => {
       setLoading(true);
+
+      // Load labs for dropdown
+      if (!isMock && supabase) {
+        const { data } = await supabase
+          .from("lab_labs")
+          .select("id, name")
+          .order("name");
+        setLabs(data ?? []);
+      } else if (isMock) {
+        setLabs([
+          { id: "lab-1", name: "Lab A" },
+          { id: "lab-2", name: "Lab B" },
+          { id: "lab-3", name: "Lab C" },
+          { id: "lab-4", name: "Lab D" },
+        ]);
+      }
+
       if (isMock) {
         const store = await import("@/lib/mockStore");
         const p = store.getPatientById(id);
@@ -72,6 +93,8 @@ export default function CaseDetail({ id }: { id: string }) {
             service: p.service,
             shade: p.shade,
             notes: p.notes ?? "",
+            delivery_date: p.delivery_date ?? "",
+            lab_id: p.lab_id ?? "",
           });
         }
         setLoading(false);
@@ -105,6 +128,8 @@ export default function CaseDetail({ id }: { id: string }) {
           service: patientData.service,
           shade: patientData.shade,
           notes: patientData.notes ?? "",
+          delivery_date: patientData.delivery_date ?? "",
+          lab_id: patientData.lab_id ?? "",
         });
       }
       setLoading(false);
@@ -134,8 +159,12 @@ export default function CaseDetail({ id }: { id: string }) {
   const saveEdits = async () => {
     if (!patient) return;
     if (isMock) {
-      const { updatePatient } = await import("@/lib/mockStore");
+      const { updatePatient, getPatientById } = await import("@/lib/mockStore");
       updatePatient(patient.id, editValues);
+      const updatedPatient = getPatientById(patient.id);
+      if (updatedPatient) {
+        setPatient(updatedPatient);
+      }
       setEditing(false);
       refresh();
       return;
@@ -177,12 +206,25 @@ export default function CaseDetail({ id }: { id: string }) {
       .from("lab_patients")
       .update(editValues)
       .eq("id", patient.id);
+
+    // Reload patient data
+    const { data: updatedPatient } = await supabase!
+      .from("lab_patients")
+      .select("*")
+      .eq("id", patient.id)
+      .single();
+
+    if (updatedPatient) {
+      setPatient(updatedPatient as Patient);
+    }
+
     setEditing(false);
     refresh();
   };
 
   const addFiles = async () => {
     if (!patient || !selectedFiles || selectedFiles.length === 0) return;
+    setUploading(true);
     if (isMock) {
       const { addFile } = await import("@/lib/mockStore");
       for (const file of Array.from(selectedFiles)) {
@@ -204,7 +246,11 @@ export default function CaseDetail({ id }: { id: string }) {
           uploaded_at: new Date().toISOString(),
         });
       }
+      // Reload files from mock store
+      const { listFilesForPatient } = await import("@/lib/mockStore");
+      setFiles(listFilesForPatient(patient.id));
       setSelectedFiles(null);
+      setUploading(false);
       refresh();
       return;
     }
@@ -225,7 +271,17 @@ export default function CaseDetail({ id }: { id: string }) {
         },
       ]);
     }
+
+    // Reload files from database
+    const { data: fls } = await supabase!
+      .from("lab_files")
+      .select("id,patient_id,file_url,file_name,uploaded_at")
+      .eq("patient_id", patient.id)
+      .order("uploaded_at", { ascending: false });
+
+    setFiles((fls as LabFile[]) ?? []);
     setSelectedFiles(null);
+    setUploading(false);
     refresh();
   };
 
@@ -446,6 +502,8 @@ export default function CaseDetail({ id }: { id: string }) {
                       service: patient.service,
                       shade: patient.shade,
                       notes: patient.notes ?? "",
+                      delivery_date: patient.delivery_date ?? "",
+                      lab_id: patient.lab_id ?? "",
                     });
                   }}
                 >
@@ -525,6 +583,53 @@ export default function CaseDetail({ id }: { id: string }) {
                     />
                   ) : (
                     <p className="mt-1">{patient.shade || "—"}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Lab</label>
+                  {editing ? (
+                    <select
+                      className="w-full rounded-md border px-2 py-1 bg-background"
+                      value={editValues.lab_id ?? ""}
+                      onChange={(e) =>
+                        setEditValues((s) => ({ ...s, lab_id: e.target.value }))
+                      }
+                    >
+                      <option value="">Select lab...</option>
+                      {labs.map((lab) => (
+                        <option key={lab.id} value={lab.id}>
+                          {lab.name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <p className="mt-1">
+                      {labs.find((l) => l.id === patient.lab_id)?.name || "—"}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">
+                    Delivery Date
+                  </label>
+                  {editing ? (
+                    <input
+                      type="date"
+                      className="w-full rounded-md border px-2 py-1 bg-background"
+                      value={editValues.delivery_date ?? ""}
+                      onChange={(e) =>
+                        setEditValues((s) => ({
+                          ...s,
+                          delivery_date: e.target.value,
+                        }))
+                      }
+                    />
+                  ) : (
+                    <p className="mt-1">
+                      {patient.delivery_date
+                        ? new Date(patient.delivery_date).toLocaleDateString()
+                        : "—"}
+                    </p>
                   )}
                 </div>
                 {isAdmin ? (
@@ -688,10 +793,35 @@ export default function CaseDetail({ id }: { id: string }) {
                   />
                 </div>
                 <button
-                  className="rounded-md border px-3 py-2"
+                  className="rounded-md border px-3 py-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   onClick={() => void addFiles()}
+                  disabled={
+                    uploading || !selectedFiles || selectedFiles.length === 0
+                  }
                 >
-                  Upload
+                  {uploading && (
+                    <svg
+                      className="animate-spin h-4 w-4"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
+                    </svg>
+                  )}
+                  {uploading ? "Uploading..." : "Upload"}
                 </button>
               </div>
             ) : null}

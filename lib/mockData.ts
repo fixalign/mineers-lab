@@ -11,6 +11,8 @@ export type MockPatient = {
   service: string;
   shade: string;
   notes: string | null;
+  delivery_date?: string | null;
+  lab_id?: string | null;
   status: "draft" | "sent" | "done" | "finished";
   created_by: string;
   created_at: string;

@@ -6,11 +6,20 @@ import { getUser } from "@/lib/authService";
 import { useMockData } from "@/lib/config";
 import { addFile, addPatient } from "@/lib/mockStore";
 
+type Lab = {
+  id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+};
+
 type NewPatientFormState = {
   name: string;
   service: string;
   shade: string;
   notes: string;
+  delivery_date: string;
+  lab_id: string;
   files: FileList | null;
 };
 
@@ -19,12 +28,15 @@ export default function PatientForm() {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [labs, setLabs] = useState<Lab[]>([]);
   const [submitMode, setSubmitMode] = useState<"draft" | "sent">("draft");
   const [form, setForm] = useState<NewPatientFormState>({
     name: "",
     service: "",
     shade: "",
     notes: "",
+    delivery_date: "",
+    lab_id: "",
     files: null,
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -39,9 +51,26 @@ export default function PatientForm() {
     const load = async () => {
       const user = await getUser();
       setUserId(user?.id ?? null);
+
+      // Load labs
+      if (!isMock && supabase) {
+        const { data } = await supabase
+          .from("lab_labs")
+          .select("id, name, email, phone")
+          .order("name");
+        setLabs(data ?? []);
+      } else if (isMock) {
+        // Mock labs for development
+        setLabs([
+          { id: "lab-1", name: "Lab A" },
+          { id: "lab-2", name: "Lab B" },
+          { id: "lab-3", name: "Lab C" },
+          { id: "lab-4", name: "Lab D" },
+        ]);
+      }
     };
     void load();
-  }, []);
+  }, [isMock]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,6 +91,8 @@ export default function PatientForm() {
         service: form.service,
         shade: form.shade,
         notes: form.notes,
+        delivery_date: form.delivery_date,
+        lab_id: form.lab_id,
         status: submitMode,
         created_by: userId,
         created_at: new Date().toISOString(),
@@ -89,7 +120,15 @@ export default function PatientForm() {
       }
       setSubmitting(false);
       setMessage("Case created successfully (mock data).");
-      setForm({ name: "", service: "", shade: "", notes: "", files: null });
+      setForm({
+        name: "",
+        service: "",
+        shade: "",
+        notes: "",
+        delivery_date: "",
+        lab_id: "",
+        files: null,
+      });
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
@@ -112,6 +151,8 @@ export default function PatientForm() {
           service: form.service,
           shade: form.shade,
           notes: form.notes,
+          delivery_date: form.delivery_date || null,
+          lab_id: form.lab_id || null,
           status: submitMode,
           created_by: userId,
         },
@@ -132,7 +173,7 @@ export default function PatientForm() {
         setMessage(`Uploading file ${i + 1} of ${fileArray.length}...`);
 
         const path = `${pat.id}/${Date.now()}-${file.name}`;
-        const { data: uploadData, error: upErr } = await supabase.storage
+        const { error: upErr } = await supabase.storage
           .from("lab_files")
           .upload(path, file, {
             upsert: false,
@@ -167,9 +208,53 @@ export default function PatientForm() {
       }
     }
 
+    // 3) Call webhook if case is sent to lab
+    if (submitMode === "sent" && form.lab_id) {
+      try {
+        const labInfo = labs.find((l) => l.id === form.lab_id);
+        const response = await fetch(
+          "https://n8n.fixaligner.com/webhook/noti-labs",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              patient_id: pat.id,
+              patient_name: form.name,
+              service: form.service,
+              shade: form.shade,
+              notes: form.notes,
+              delivery_date: form.delivery_date,
+              lab_id: form.lab_id,
+              lab_name: labInfo?.name || "Unknown Lab",
+              lab_email: labInfo?.email || "",
+              lab_phone: labInfo?.phone || "",
+              created_at: new Date().toISOString(),
+            }),
+          }
+        );
+
+        if (!response.ok) {
+          console.error("Webhook notification failed:", await response.text());
+        }
+      } catch (error) {
+        console.error("Failed to send webhook notification:", error);
+        // Don't block the submission if webhook fails
+      }
+    }
+
     setSubmitting(false);
     setMessage("Case created successfully.");
-    setForm({ name: "", service: "", shade: "", notes: "", files: null });
+    setForm({
+      name: "",
+      service: "",
+      shade: "",
+      notes: "",
+      delivery_date: "",
+      lab_id: "",
+      files: null,
+    });
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -249,6 +334,32 @@ export default function PatientForm() {
             onChange={(e) => setForm((s) => ({ ...s, shade: e.target.value }))}
             className="w-full rounded-md border px-3 py-2 bg-background"
             placeholder="A2, BL3, ..."
+          />
+        </div>
+        <div className="space-y-1">
+          <label className="text-sm">Lab</label>
+          <select
+            value={form.lab_id}
+            onChange={(e) => setForm((s) => ({ ...s, lab_id: e.target.value }))}
+            className="w-full rounded-md border px-3 py-2 bg-background"
+          >
+            <option value="">Select lab...</option>
+            {labs.map((lab) => (
+              <option key={lab.id} value={lab.id}>
+                {lab.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="space-y-1">
+          <label className="text-sm">Delivery Date</label>
+          <input
+            type="date"
+            value={form.delivery_date}
+            onChange={(e) =>
+              setForm((s) => ({ ...s, delivery_date: e.target.value }))
+            }
+            className="w-full rounded-md border px-3 py-2 bg-background"
           />
         </div>
         <div className="space-y-1 md:col-span-2">

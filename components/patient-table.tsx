@@ -110,10 +110,53 @@ export default function PatientTable() {
       refresh();
       return;
     }
+
+    // Get patient details before updating
+    const { data: patient } = await supabase!
+      .from("lab_patients")
+      .select("*, lab_labs(name, email, phone)")
+      .eq("id", id)
+      .single();
+
+    // Update status to sent
     await supabase!
       .from("lab_patients")
       .update({ status: "sent" })
       .eq("id", id);
+
+    // Call webhook if patient has lab_id
+    if (patient?.lab_id) {
+      try {
+        const patientWithLab = patient as typeof patient & {
+          lab_labs?: { name: string; email: string; phone: string };
+        };
+        const labName = patientWithLab.lab_labs?.name || "Unknown Lab";
+        const labEmail = patientWithLab.lab_labs?.email || "";
+        const labPhone = patientWithLab.lab_labs?.phone || "";
+        await fetch("https://n8n.fixaligner.com/webhook-test/noti-labs", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            patient_id: patient.id,
+            patient_name: patient.name,
+            service: patient.service,
+            shade: patient.shade,
+            notes: patient.notes,
+            delivery_date: patient.delivery_date,
+            lab_id: patient.lab_id,
+            lab_name: labName,
+            lab_email: labEmail,
+            lab_phone: labPhone,
+            created_at: patient.created_at,
+          }),
+        });
+      } catch (error) {
+        console.error("Failed to send webhook notification:", error);
+      }
+    }
+
     refresh();
   };
 

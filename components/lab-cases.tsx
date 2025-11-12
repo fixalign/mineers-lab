@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useMockData } from "@/lib/config";
 import { listAllPatients, listFiles } from "@/lib/mockStore";
+import { getUser } from "@/lib/authService";
 
 type Patient = {
   id: string;
@@ -11,6 +12,7 @@ type Patient = {
   service: string;
   shade: string;
   notes: string | null;
+  delivery_date?: string | null;
   created_at: string;
   status?: "draft" | "sent" | "done" | "finished";
 };
@@ -32,6 +34,16 @@ export default function LabCases() {
   useEffect(() => {
     const load = async () => {
       setLoading(true);
+
+      // Get the logged-in user
+      const user = await getUser();
+      if (!user) {
+        setPatients([]);
+        setFiles([]);
+        setLoading(false);
+        return;
+      }
+
       if (isMock) {
         setPatients(
           listAllPatients().filter(
@@ -42,28 +54,51 @@ export default function LabCases() {
         setLoading(false);
         return;
       }
+
       if (!supabase) {
         setPatients([]);
         setFiles([]);
         setLoading(false);
         return;
       }
-      const [{ data: pats }, { data: fls }] = await Promise.all([
-        supabase
-          .from("lab_patients")
-          .select("id,name,service,shade,notes,created_at,status")
-          .order("created_at", { ascending: false }),
-        supabase
+
+      // Get the lab by email
+      const { data: lab } = await supabase
+        .from("lab_labs")
+        .select("id")
+        .eq("email", user.email)
+        .single();
+
+      if (!lab) {
+        setPatients([]);
+        setFiles([]);
+        setLoading(false);
+        return;
+      }
+
+      // Fetch patients for this lab only
+      const { data: pats } = await supabase
+        .from("lab_patients")
+        .select("id,name,service,shade,notes,delivery_date,created_at,status")
+        .eq("lab_id", lab.id)
+        .in("status", ["sent", "done"])
+        .order("created_at", { ascending: false });
+
+      setPatients(pats ?? []);
+
+      // Fetch files for these patients
+      if (pats && pats.length > 0) {
+        const patientIds = pats.map((p: any) => p.id);
+        const { data: fls } = await supabase
           .from("lab_files")
           .select("id,file_url,file_name,uploaded_at,patient_id")
-          .order("uploaded_at", { ascending: false }),
-      ]);
-      setPatients(
-        (pats ?? []).filter(
-          (p: any) => p.status === "sent" || p.status === "done"
-        )
-      );
-      setFiles(fls ?? []);
+          .in("patient_id", patientIds)
+          .order("uploaded_at", { ascending: false });
+        setFiles(fls ?? []);
+      } else {
+        setFiles([]);
+      }
+
       setLoading(false);
     };
     void load();
@@ -136,6 +171,17 @@ export default function LabCases() {
                   <span>
                     {pf.length} file{pf.length !== 1 ? "s" : ""}
                   </span>
+                  {p.delivery_date ? (
+                    <>
+                      <span>•</span>
+                      <span>
+                        Due:{" "}
+                        <span className="font-medium text-foreground">
+                          {new Date(p.delivery_date).toLocaleDateString()}
+                        </span>
+                      </span>
+                    </>
+                  ) : null}
                 </div>
                 {p.notes ? (
                   <p className="text-sm text-muted-foreground line-clamp-2 mt-2">
