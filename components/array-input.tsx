@@ -20,7 +20,7 @@ import { useFieldArray, useFormContext } from "react-hook-form";
 
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "../ui/skeleton";
 import { InputHelperText } from "@/components/input-helper-text";
 import { FormError, FormField } from "@/components/form";
 
