@@ -6,7 +6,7 @@ import {
   UseBulkExportOptions,
 } from "ra-core";
 
-import { Button } from "../ui/button";
+import { Button } from "@/components/ui/button";
 
 /**
  * Export the selected rows

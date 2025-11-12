@@ -2,7 +2,7 @@ import { CircleX } from "lucide-react";
 import { Translate } from "ra-core";
 import { useNavigate } from "react-router";
 
-import { Button } from "../ui/button";
+import { Button } from "@/components/ui/button";
 
 export function CancelButton(props: React.ComponentProps<"button">) {
   const navigate = useNavigate();
