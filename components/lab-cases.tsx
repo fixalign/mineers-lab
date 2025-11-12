@@ -12,7 +12,7 @@ type Patient = {
   shade: string;
   notes: string | null;
   created_at: string;
-  status?: "draft" | "sent" | "done";
+  status?: "draft" | "sent" | "done" | "finished";
 };
 
 type LabFile = {

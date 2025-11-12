@@ -1,11 +1,6 @@
-import {
-  createClientComponentClient,
-  type SupabaseClient,
-} from "@supabase/auth-helpers-nextjs";
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { useMockData } from "./config";
 
-export type AppSupabaseClient = SupabaseClient | null;
+export const supabase = useMockData ? null : createClientComponentClient();
 
-export const supabase: AppSupabaseClient = useMockData
-  ? null
-  : createClientComponentClient();
+export type AppSupabaseClient = typeof supabase;

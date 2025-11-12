@@ -14,7 +14,7 @@ type Patient = {
   shade: string;
   notes: string | null;
   created_at: string;
-  status?: "draft" | "sent" | "done";
+  status?: "draft" | "sent" | "done" | "finished";
 };
 
 type LabFile = {
@@ -131,55 +131,6 @@ export default function PatientTable() {
   };
 
   // inline file upload removed per request
-
-  const UploadInline = ({
-    onFilesSelected,
-    onUpload,
-    onCancel,
-  }: {
-    onFilesSelected: (files: FileList | null) => void;
-    onUpload: () => void;
-    onCancel: () => void;
-  }) => {
-    const accept =
-      ".jpg,.jpeg,.png,.gif,.webp,.pdf,.dcm,.stl,.ply,.obj,.3mf,.zip";
-    const handleDrop = (e: React.DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      onFilesSelected(e.dataTransfer?.files ?? null);
-    };
-    return (
-      <div
-        onDragOver={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-        }}
-        onDrop={handleDrop}
-        className="flex flex-col gap-2 rounded-md border p-2"
-      >
-        <div className="flex items-center gap-2">
-          <input
-            ref={uploadInputRef}
-            type="file"
-            multiple
-            accept={accept}
-            onChange={(e) => onFilesSelected(e.target.files)}
-            className="block rounded-md border px-2 py-1 bg-background"
-          />
-          <button className="rounded-md border px-2 py-1" onClick={onUpload}>
-            Upload
-          </button>
-          <button className="text-xs text-muted-foreground" onClick={onCancel}>
-            Cancel
-          </button>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          Drag & drop files here or click to choose. Accepted: images, PDF,
-          DICOM, STL/PLY/OBJ/3MF, ZIP.
-        </p>
-      </div>
-    );
-  };
 
   if (loading) {
     return <p className="text-sm">Loading…</p>;

@@ -93,15 +93,18 @@ export default function CaseDetail({ id }: { id: string }) {
         .select("id,patient_id,file_url,file_name,uploaded_at")
         .eq("patient_id", id)
         .order("uploaded_at", { ascending: false });
-      setPatient(p as Patient | null);
+
+      const patientData = p as Patient | null;
+      setPatient(patientData);
       setFiles((fls as LabFile[]) ?? []);
-      if (p && search?.get("edit") === "1") {
+
+      if (patientData && search?.get("edit") === "1") {
         setEditing(true);
         setEditValues({
-          name: p.name,
-          service: p.service,
-          shade: p.shade,
-          notes: p.notes ?? "",
+          name: patientData.name,
+          service: patientData.service,
+          shade: patientData.shade,
+          notes: patientData.notes ?? "",
         });
       }
       setLoading(false);
