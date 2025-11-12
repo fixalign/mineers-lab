@@ -20,7 +20,7 @@ import { useFieldArray, useFormContext } from "react-hook-form";
 
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { Skeleton } from "../ui/skeleton";
+import { Skeleton } from "@/components/ui/skeleton";
 import { InputHelperText } from "@/components/input-helper-text";
 import { FormError, FormField } from "@/components/form";
 
@@ -117,7 +117,7 @@ export const ArrayInput = (props: ArrayInputProps) => {
       getLabel: (source: string) =>
         parentSourceContext.getLabel(`${arraySource}.${source}`),
     }),
-    [parentSourceContext, arraySource],
+    [parentSourceContext, arraySource]
   );
 
   if (isPending) {
@@ -130,7 +130,7 @@ export const ArrayInput = (props: ArrayInputProps) => {
         "ra-input",
         `ra-input-${finalSource}`,
         className,
-        "w-full flex flex-col gap-2",
+        "w-full flex flex-col gap-2"
       )}
       name={finalSource}
       {...sanitizeInputRestProps(rest)}
